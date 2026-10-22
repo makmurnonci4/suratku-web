@@ -259,6 +259,7 @@ const inp='style="background:var(--bg);border:1px solid var(--line);border-radiu
 const FB={apiKey:"AIzaSyDR1mDn7L-EaENm-eQos9eVY-d7nOFoais",authDomain:"surat-aktivitas-ku.firebaseapp.com",projectId:"surat-aktivitas-ku",appId:"1:674813208292:web:0b6642c8cd22d494ee357d"};
 const ADMIN_EMAILS=["makmurnonci4@gmail.com"];
 /* ============================================ */
+const tulis=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({code:"timeout",message:"server tidak merespons"}),12000))]);
 let started=false;const lst={},sub={};
 const byNew=(a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"");
 function bantuan(){app.innerHTML='<div class="gate" style="max-width:640px"><h2>Konfigurasi belum diisi</h2><div>Isi <b>FB</b> dan <b>ADMIN_EMAILS</b> di bagian atas script terakhir pada file ini, sesuai panduan.</div></div>'}
@@ -309,7 +310,10 @@ function renderKepsek(){
 }
 function vSek(){
   $("#body").innerHTML=`<div class="form"><label>Tambah sekolah binaan<textarea id="sn" rows="4" placeholder="Satu nama sekolah per baris"></textarea></label><div><button class="btn" id="sadd">Tambahkan</button></div></div><div style="margin-top:16px">${sek.length?sek.map(x=>{const k=appr.filter(a=>a.sekolahId===x.id&&a.peran!=="operator"),op=appr.filter(a=>a.sekolahId===x.id&&a.peran==="operator");return`<div class="row" style="cursor:default"><div class="main"><b>${esc(x.nama)}</b><span>${k.length?"Kepala sekolah: "+esc(k.map(a=>a.nama).join(", ")):"Belum ada kepala sekolah terdaftar"}${op.length?" · Operator: "+esc(op.map(a=>a.nama).join(", ")):""} · ${letters.filter(l=>l.sekolahId===x.id).length} surat</span></div><button class="btn danger" data-ds="${x.id}">Hapus</button></div>`}).join(""):'<div class="empty">Belum ada sekolah binaan. Tambahkan nama sekolah di atas.</div>'}</div>`;
-  $("#sadd").onclick=async()=>{const ls=$("#sn").value.split("\n").map(x=>x.trim()).filter(x=>x&&!sek.some(y=>y.nama===x));$("#sadd").disabled=true;for(const n of ls)await db.doc("sekolah/"+rid()).set({nama:n})};
+  $("#sadd").onclick=async()=>{const ls=$("#sn").value.split("\n").map(x=>x.trim()).filter(x=>x&&!sek.some(y=>y.nama===x));if(!ls.length)return;const bt=$("#sadd");bt.disabled=true;
+    try{for(const n of ls)await tulis(db.doc("sekolah/"+rid()).set({nama:n}));$("#sn").value=""}
+    catch(e){bt.insertAdjacentHTML("afterend",'<div class="msg" style="margin-top:8px">Gagal menyimpan ('+esc(e.code||e.message)+'). '+(e.code==="permission-denied"?"Periksa aturan Firestore dan email admin.":"Periksa koneksi dan pastikan Firestore sudah dibuat.")+'</div>')}
+    bt.disabled=false};
   document.querySelectorAll("[data-ds]").forEach(b=>b.onclick=async()=>{if(confirm("Hapus sekolah ini dari daftar?"))await db.doc("sekolah/"+b.dataset.ds).delete()});
 }
 function vIzin(){
@@ -317,7 +321,7 @@ function vIzin(){
   const item=(p,btns)=>`<div class="row" style="cursor:default"><div class="main"><b>${esc(p.nama)}</b><span>${p.peran==="operator"?"Operator":"Kepala sekolah"} · ${esc(p.sekolahNama)} · NIP ${esc(p.nip||"-")}</span></div>${btns}</div>`;
   $("#body").innerHTML=`<h3 style="margin-bottom:8px">Menunggu persetujuan</h3>${wait.length?wait.map(p=>item(p,`<button class="btn" data-ok="${p.id}">Setujui</button><button class="btn danger" data-no="${p.id}">Tolak</button>`)).join(""):'<div class="empty">Tidak ada permintaan baru.</div>'}
   <h3 style="margin:20px 0 8px">Kepala sekolah yang disetujui</h3>${appr.length?appr.map(a=>item({...a,sekolahNama:a.sekolahNama},`<button class="btn danger" data-rv="${a.id}">Cabut akses</button>`)).join(""):'<div class="empty">Belum ada kepala sekolah yang disetujui.</div>'}`;
-  const act=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.onclick=async()=>{b.disabled=true;try{await fn(b)}catch(e){b.disabled=false}});
+  const act=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.onclick=async()=>{b.disabled=true;try{await fn(b)}catch(e){b.disabled=false;if(e)flash("Gagal: "+(e.code||e.message),1)}});
   act("[data-ok]",async b=>{const p=peng.find(x=>x.id===b.dataset.ok);await db.doc("disetujui/"+p.id).set({nama:p.nama,nip:p.nip||"",peran:p.peran||"kepala",sekolahId:p.sekolahId,sekolahNama:p.sekolahNama,at:new Date().toISOString()});await db.doc("pengajuan/"+p.id).update({status:"disetujui"})});
   act("[data-no]",b=>db.doc("pengajuan/"+b.dataset.no).update({status:"ditolak"}));
   act("[data-rv]",async b=>{if(!confirm("Cabut akses kepala sekolah ini?"))throw 0;await db.doc("disetujui/"+b.dataset.rv).delete();await db.doc("pengajuan/"+b.dataset.rv).update({status:"dicabut"})});

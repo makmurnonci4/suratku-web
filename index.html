@@ -263,8 +263,11 @@ const tulis=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({code:"timeou
 let started=false;const lst={},sub={};
 const byNew=(a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"");
 function bantuan(){app.innerHTML='<div class="gate" style="max-width:640px"><h2>Konfigurasi belum diisi</h2><div>Isi <b>FB</b> dan <b>ADMIN_EMAILS</b> di bagian atas script terakhir pada file ini, sesuai panduan.</div></div>'}
-function masuk(){app.innerHTML='<div class="gate"><h2>Masuk</h2><div class="note">Masuk dengan akun Google Anda untuk melanjutkan.</div><button class="btn" id="g">Masuk dengan Google</button><div id="err"></div></div>';
-  $("#g").onclick=()=>firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{$("#err").innerHTML='<div class="msg">Gagal masuk: '+esc(e.code||e.message)+'</div>'})}
+function flash(m,bad){const d=document.createElement("div");d.className="msg"+(bad?"":" okmsg");d.style.marginBottom="12px";d.textContent=m;setTimeout(()=>app.prepend(d),0)}
+function masuk(){
+  app.innerHTML='<div class="gate"><h2>Masuk</h2><div class="note">Pilih peran Anda, lalu masuk dengan akun Google.</div><button class="btn" data-p="kepala">Masuk sebagai Kepala sekolah</button><button class="btn ghost" data-p="operator">Masuk sebagai Operator sekolah</button><button class="btn ghost" data-p="pengawas">Masuk sebagai Pengawas (admin)</button><div id="err"></div></div>';
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("peran_pilihan",b.dataset.p)}catch(e){}
+    firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{$("#err").innerHTML='<div class="msg">Gagal masuk: '+esc(e.code||e.message)+'</div>'})})}
 function init(){
   if(FB.apiKey.startsWith("ISI"))return bantuan();
   firebase.initializeApp(FB);db=firebase.firestore();
@@ -273,6 +276,7 @@ function init(){
 function mulai(u){
   me=u.uid;isPengawas=ADMIN_EMAILS.map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase());
   $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah / operator";
+  try{if(localStorage.getItem("peran_pilihan")==="pengawas"&&!isPengawas)flash("Email ini tidak terdaftar sebagai pengawas. Anda masuk sebagai kepala sekolah atau operator.",1)}catch(e){}
   if(!$("#out")){document.querySelector("header.top").insertAdjacentHTML("beforeend",'<button class="btn ghost" id="out">Keluar</button>');$("#out").onclick=()=>firebase.auth().signOut().then(()=>location.reload())}
   sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));
     if(isPengawas)sek.forEach(x=>{if(!sub[x.id])sub[x.id]=sn(db.collection("sekolah/"+x.id+"/surat"),r=>{lst[x.id]=rows(r);letters=[].concat(...Object.values(lst)).sort(byNew);render()})});
@@ -291,6 +295,7 @@ function mulai(u){
 }
 function renderKepsek(){
   if(cur)return renderSign();
+  $("#role").textContent=akses?(akses.peran==="operator"?"Operator sekolah":"Kepala sekolah"):"Belum disetujui";
   if(akses){
     const w=letters.filter(l=>l.status==="menunggu").length;
     app.innerHTML=`<div class="stat" style="margin-bottom:16px"><b style="font-size:22px">${esc(akses.sekolahNama)}</b><span>Masuk sebagai ${esc(akses.nama)}${akses.peran==="operator"?" (operator sekolah)":""} · ${w?w+" surat menunggu tanda tangan Anda":"tidak ada surat yang menunggu"}</span></div>
@@ -303,6 +308,7 @@ function renderKepsek(){
   app.innerHTML=`<div class="gate"><h2>Daftar ke ruang sekolah</h2><div class="note">Pilih sekolah Anda. Pengawas akan memeriksa lalu menyetujui akses Anda.</div>${note?`<div class="msg">${note}</div>`:""}
   <label>Nama lengkap<input id="a_nama" ${inp} style="font:inherit;letter-spacing:0;text-align:left;text-transform:none" value="${esc(pj&&pj.nama)}"></label><label>NIP<input id="a_nip" ${inp} style="font:inherit;letter-spacing:0;text-align:left;text-transform:none" value="${esc(pj&&pj.nip)}"></label>
   <label>Daftar sebagai<select id="a_peran" ${inp}><option value="kepala">Kepala sekolah</option><option value="operator">Operator sekolah (mewakili kepala sekolah yang belum mendaftar)</option></select></label><label>Sekolah<select id="a_sek" ${inp}>${sek.length?sek.map(x=>`<option value="${x.id}">${esc(x.nama)}</option>`).join(""):'<option value="">Belum ada sekolah terdaftar</option>'}</select></label><div id="err"></div><button class="btn" id="a_go">Ajukan akses</button></div>`;
+  try{const pp=localStorage.getItem("peran_pilihan");if(pp==="operator"||pp==="kepala")$("#a_peran").value=pp}catch(e){}
   $("#a_go").onclick=async()=>{const nama=$("#a_nama").value.trim(),sid=$("#a_sek").value,sk=sek.find(x=>x.id===sid);
     if(!nama||!sk){$("#err").innerHTML='<div class="msg">Isi nama dan pilih sekolah Anda.</div>';return}
     try{await db.doc("pengajuan/"+me).set({nama,nip:$("#a_nip").value.trim(),peran:$("#a_peran").value,sekolahId:sid,sekolahNama:sk.nama,status:"menunggu",createdAt:new Date().toISOString()})}

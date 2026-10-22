@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard Surat Pengawas Sekolah</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3f1ec;--surf:#fff;--ink:#1c2740;--mute:#667088;--line:#d9d6cd;--acc:#1f3a6e;--accfg:#fff;--wait:#b4471f;--waitbg:#fbe9e0;--ok:#1f6b4a;--okbg:#e2f1e9;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151a26;--surf:#1d2434;--ink:#e7eaf2;--mute:#9aa4bb;--line:#33405a;--acc:#8fb0ee;--accfg:#10192b;--wait:#f0a07f;--waitbg:#3a2418;--ok:#7fd1a6;--okbg:#18342a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151a26;--surf:#1d2434;--ink:#e7eaf2;--mute:#9aa4bb;--line:#33405a;--acc:#8fb0ee;--accfg:#10192b;--wait:#f0a07f;--waitbg:#3a2418;--ok:#7fd1a6;--okbg:#18342a;color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:inherit}
+h1,h2,h3{font-family:"Source Serif 4",Georgia,serif;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 16px}
+header.top h1{font-size:24px;flex:1;min-width:200px}
+header.top small{display:block;font:500 14px "Source Sans 3",sans-serif;color:var(--mute)}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font:600 15px inherit;font-family:inherit;color:var(--mute);cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--acc)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btn{background:var(--acc);color:var(--accfg);border:0;border-radius:6px;padding:9px 16px;font-weight:600;cursor:pointer}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:none;color:var(--wait);border:1px solid var(--wait)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:14px}
+.stat b{display:block;font:700 30px "Source Serif 4",serif}
+.stat span{color:var(--mute);font-size:14px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.bar select,.bar input{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.bar input{flex:1;min-width:160px}
+.row{display:flex;gap:12px;align-items:center;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;flex-wrap:wrap}
+.row:hover{border-color:var(--acc)}
+.row .main{flex:1;min-width:200px}
+.row .main b{display:block}
+.row .main span{color:var(--mute);font-size:14px}
+.badge{font-size:13px;font-weight:600;border-radius:99px;padding:3px 10px}
+.badge.wait{background:var(--waitbg);color:var(--wait)}
+.badge.ok{background:var(--okbg);color:var(--ok)}
+.code{font:600 14px ui-monospace,Menlo,monospace;background:var(--bg);border:1px dashed var(--line);border-radius:4px;padding:2px 8px}
+.empty{text-align:center;color:var(--mute);padding:36px 12px;border:1px dashed var(--line);border-radius:8px}
+.types{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.type{background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.type h3{font-size:20px}
+.type ul{margin:0;padding-left:18px;color:var(--mute);font-size:15px}
+.type .btns{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
+.form{background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:18px;display:grid;gap:14px}
+.form label{display:grid;gap:4px;font-weight:600;font-size:14px}
+.form input[type=text],.form input[type=date],.form select,.form textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-weight:400}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.chk{display:flex;gap:16px;flex-wrap:wrap}.chk label{display:flex;flex-direction:row;gap:6px;align-items:center;font-weight:400;font-size:16px}
+.guru{display:grid;grid-template-columns:repeat(4,1fr) auto;gap:6px}
+.guru input{min-width:0}
+@media(max-width:640px){.guru{grid-template-columns:1fr 1fr}}
+.note{color:var(--mute);font-size:14px}
+.side{display:grid;grid-template-columns:1fr;gap:16px}
+.sign{background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:12px}
+canvas{width:100%;max-width:420px;height:150px;background:#fff;border:1px solid var(--line);border-radius:6px;touch-action:none;cursor:crosshair}
+/* kertas surat: selalu putih agar seperti dokumen cetak */
+.paper{background:#fff;color:#111;font:14px/1.55 "Source Serif 4",Georgia,serif;border:1px solid var(--line);padding:36px 40px;border-radius:2px;box-shadow:0 1px 0 var(--line);overflow-x:auto}
+.paper h2{text-align:center;font-size:17px;text-decoration:underline;margin:14px 0 2px}
+.paper .kop{text-align:center;line-height:1.35}
+.paper .kop b{display:block}
+.paper .ctr{text-align:center}
+.paper table{border-collapse:collapse;width:100%}
+.paper .kv td{padding:1px 4px;vertical-align:top}
+.paper .grid td,.paper .grid th{border:1px solid #111;padding:5px 7px;font-weight:400;text-align:left;vertical-align:top}
+.paper .grid th{font-weight:700;text-align:center}
+.ttd{display:flex;justify-content:flex-end;margin-top:22px}
+.ttd.two{justify-content:space-between}
+.ttd div{text-align:center;min-width:200px}
+.ttd img{height:64px;display:block;margin:4px auto}
+.ttd .gap{height:72px}
+.hidden{display:none!important}
+.gate{max-width:440px;margin:40px auto;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:24px;display:grid;gap:12px}
+.gate #kode{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font:600 20px ui-monospace,Menlo,monospace;letter-spacing:.2em;text-align:center;text-transform:uppercase}
+.msg{padding:10px 12px;border-radius:6px;background:var(--waitbg);color:var(--wait);font-size:14px}
+.okmsg{background:var(--okbg);color:var(--ok)}
+@media print{body{background:#fff}header.top,nav,.sign,.noprint{display:none!important}.paper{border:0;padding:0}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Surat Pengawas Sekolah<small>Makmur Nonci, S.Pd., MM.Pd. · Kec. Bacukiki Barat</small></h1>
+    <span id="role" class="badge ok"></span>
+  </header>
+  <div id="app"></div>
+</div>
+
+<script>
+const PENGAWAS={nama:"MAKMUR NONCI, S.Pd., MM.Pd",nip:"19680115 198809 1 001"};
+const TYPES={
+  supervisi:{nama:"Surat Pernyataan Supervisi",ket:"Pernyataan kepala sekolah bahwa pengawas telah melakukan supervisi kepada guru.",isi:["Data kepala sekolah dilengkapi saat menandatangani","Tabel guru yang disupervisi: nama/NIP, kelas, tanggal, mapel","Ditandatangani kepala sekolah"]},
+  aktivitas:{nama:"Lembar Aktivitas Pengawas",ket:"Catatan kegiatan pengawas di sekolah binaan, diketahui kepala sekolah.",isi:["Jenis kegiatan: pembinaan, supervisi, monitoring, pendampingan","Tempat, hari/tanggal, dan keterangan","Mengetahui: kepala sekolah"]}
+};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tgl=d=>d?new Date(d).toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"}):".....................";
+const dots=(v,n=40)=>v?esc(v):".".repeat(n);
+let db=null,isPengawas=false,col=null,letters=[],tab="dash",openId=null,filter={st:"",ty:"",q:""},draftType="supervisi",unsub=null,gateMsg="";
+const app=$("#app");
+
+/* ====== ISI BAGIAN INI (lihat panduan) ====== */
+const FB={apiKey:"AIzaSyDR1mDn7L-EaENm-eQos9eVY-d7nOFoais",authDomain:"surat-aktivitas-ku.firebaseapp.com",projectId:"surat-aktivitas-ku",appId:"1:674813208292:web:0b6642c8cd22d494ee357d"};
+const ADMIN_EMAILS=["makmurnonci4@gmail.com"];
+/* ============================================ */
+let started=false;const lst={},sub={};
+const byNew=(a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"");
+function bantuan(){app.innerHTML='<div class="gate" style="max-width:640px"><h2>Konfigurasi belum diisi</h2><div>Isi <b>FB</b> dan <b>ADMIN_EMAILS</b> di bagian atas script terakhir pada file ini, sesuai panduan.</div></div>'}
+function masuk(){app.innerHTML='<div class="gate"><h2>Masuk</h2><div class="note">Masuk dengan akun Google Anda untuk melanjutkan.</div><button class="btn" id="g">Masuk dengan Google</button><div id="err"></div></div>';
+  $("#g").onclick=()=>firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{$("#err").innerHTML='<div class="msg">Gagal masuk: '+esc(e.code||e.message)+'</div>'})}
+function init(){
+  if(FB.apiKey.startsWith("ISI"))return bantuan();
+  firebase.initializeApp(FB);db=firebase.firestore();
+  firebase.auth().onAuthStateChanged(u=>{if(!u){started=false;return masuk()}if(started)return;started=true;mulai(u)});
+}
+function mulai(u){
+  me=u.uid;isPengawas=ADMIN_EMAILS.map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase());
+  $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah / operator";
+  if(!$("#out")){document.querySelector("header.top").insertAdjacentHTML("beforeend",'<button class="btn ghost" id="out">Keluar</button>');$("#out").onclick=()=>firebase.auth().signOut().then(()=>location.reload())}
+  sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));
+    if(isPengawas)sek.forEach(x=>{if(!sub[x.id])sub[x.id]=sn(db.collection("sekolah/"+x.id+"/surat"),r=>{lst[x.id]=rows(r);letters=[].concat(...Object.values(lst)).sort(byNew);render()})});
+    if(!cur)render()});
+  if(isPengawas){
+    sn(db.collection("pengajuan"),s=>{peng=rows(s);render()});
+    sn(db.collection("disetujui"),s=>{appr=rows(s);render()});
+  }else{
+    sn(db.doc("disetujui/"+me),s=>{akses=s.exists?s.data():null;if(unsub){unsub();unsub=null}
+      if(akses&&akses.sekolahId)unsub=sn(db.collection("sekolah/"+akses.sekolahId+"/surat"),r=>{letters=rows(r).sort(byNew);if(!cur)render()});
+      else letters=[];
+      if(!cur)render()});
+    sn(db.doc("pengajuan/"+me),s=>{pj=s.exists?s.data():null;if(!cur)render()});
+  }
+  render();
+}
+function renderKepsek(){
+  if(cur)return renderSign();
+  app.innerHTML=`<div class="gate"><h2>Buka surat</h2><div class="note">Masukkan kode akses 6 karakter yang diberikan oleh Pengawas Sekolah.</div><input id="kode" maxlength="6" autocomplete="off" aria-label="Kode akses"><button class="btn" id="go">Buka surat</button>${gateMsg?`<div class="msg">${gateMsg}</div>`:""}</div>`;
+  $("#go").onclick=()=>bukaKode($("#kode").value);
+  $("#kode").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
+}
+async function bukaKode(k){
+  k=(k||"").trim().toUpperCase();gateMsg="";
+  try{const r=await col.doc(k).get();if(r.exists){cur={id:k,...r.data()}}else gateMsg="Kode tidak ditemukan. Periksa kembali kode Anda."}catch(e){gateMsg="Surat tidak dapat dibuka saat ini."}
+  render();
+}
+function renderSign(){
+  const s=cur,done=s.status==="ditandatangani";
+  app.innerHTML=`<div class="bar noprint"><button class="btn ghost" id="back">Tutup</button><button class="btn ghost" id="prt">Cetak</button><span style="flex:1"></span><span class="badge ${done?"ok":"wait"}">${done?"Sudah ditandatangani":"Menunggu tanda tangan Anda"}</span></div>
+  <div class="side">${done?`<div class="msg okmsg">Surat ini sudah ditandatangani pada ${tgl(s.sign.at)}.</div>`:`<div class="sign"><h3>Tanda tangan</h3>
+  <div class="g2"><label>Nama lengkap<input id="s_nama" value="${esc(s.kepala||(akses&&akses.peran!=="operator"&&akses.nama)||"")}" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label><label>NIP<input id="s_nip" value="${esc(s.kepNip||(akses&&akses.peran!=="operator"&&akses.nip)||"")}" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label></div>
+  ${s.type==="supervisi"?`<div class="g2"><label>Nomor surat<input id="s_nomor" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label><label>Alamat sekolah<input id="s_alamat" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label></div>`:""}
+  ${akses&&akses.peran==="operator"?`<div class="msg okmsg">Anda masuk sebagai operator. Serahkan perangkat ini kepada kepala sekolah untuk memeriksa data dan menandatangani.</div><label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:flex-start"><input type="checkbox" id="s_conf" style="margin-top:4px"> Kepala sekolah hadir dan menandatangani sendiri di perangkat ini.</label>`:""}<div class="note">Gambar tanda tangan pada kotak di bawah dengan jari atau mouse.</div><canvas id="cv" width="840" height="300"></canvas>
+  <div id="err"></div><div style="display:flex;gap:8px"><button class="btn" id="ttd">Tandatangani surat</button><button class="btn ghost" id="clr">Hapus coretan</button></div></div>`}
+  <div id="pp">${paper(s)}</div></div>`;
+  $("#back").onclick=()=>{cur=null;render()};
+  $("#prt").onclick=()=>{try{window.print()}catch(e){}};
+  if(done)return;
+  const cv=$("#cv"),c=cv.getContext("2d");let drawing=false,dirty=false;
+  c.lineWidth=4;c.lineCap="round";c.lineJoin="round";c.strokeStyle="#10203f";
+  const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+  cv.onpointerdown=e=>{drawing=true;cv.setPointerCapture(e.pointerId);const[x,y]=pt(e);c.beginPath();c.moveTo(x,y)};
+  cv.onpointermove=e=>{if(!drawing)return;const[x,y]=pt(e);c.lineTo(x,y);c.stroke();dirty=true};
+  cv.onpointerup=()=>drawing=false;
+  $("#clr").onclick=()=>{c.clearRect(0,0,cv.width,cv.height);dirty=false};
+  const preview=()=>{cur.sign={nama:$("#s_nama").value,nip:$("#s_nip").value,nomor:$("#s_nomor")?.value,alamat:$("#s_alamat")?.value,at:new Date().toISOString()};$("#pp").innerHTML=paper(cur);cur.sign=undefined};
+  document.querySelectorAll(".sign input").forEach(i=>i.oninput=preview);preview();
+  $("#ttd").onclick=async()=>{
+    const nama=$("#s_nama").value.trim();
+    if(!nama||!dirty||($("#s_conf")&&!$("#s_conf").checked)){$("#err").innerHTML='<div class="msg">Lengkapi nama dan tanda tangan, dan centang konfirmasi jika Anda operator.</div>';return}
+    const sign={nama,nip:$("#s_nip").value.trim(),nomor:$("#s_nomor")?.value.trim()||"",alamat:$("#s_alamat")?.value.trim()||"",img:cv.toDataURL("image/png"),via:akses&&akses.peran==="operator"?akses.nama:"",at:new Date().toISOString()};
+    $("#ttd").disabled=true;
+    try{await db.doc("sekolah/"+s.sekolahId+"/surat/"+s.id).update({status:"ditandatangani",sign});cur={...s,status:"ditandatangani",sign};renderSign()}
+    catch(e){$("#ttd").disabled=false;$("#err").innerHTML='<div class="msg">Tanda tangan belum tersimpan. Pastikan Anda diberi akses sebagai Contributor, lalu coba lagi.</div>'}
+  };
+}
+</script>
+
+<script>
+let me=null,sek=[],peng=[],appr=[],akses=null,pj=null;
+const rid=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>"abcdefghjkmnpqrstuvwxyz23456789"[b%31]).join("");
+const rows=q=>q.docs.map(d=>({id:d.id,...d.data()}));
+const sn=(ref,fn)=>ref.onSnapshot(fn,e=>{app.innerHTML='<div class="empty">Data tidak dapat dimuat. Periksa koneksi dan aturan keamanan Firestore.</div>'});
+const inp='style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;width:100%"';
+async function init(){
+  let user=null;try{user=await claude.use("user")}catch(e){}
+  try{db=await claude.use("db")}catch(e){}
+  try{isPengawas=user?await user.canEdit():false}catch(e){}
+  try{me=user?await user.id():null}catch(e){}
+  $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah";
+  if(!db||(!me&&!isPengawas)){app.innerHTML='<div class="empty">Masuk ke akun claude.ai untuk membuka halaman ini.</div>';return}
+  col=db.collection("surat");
+  sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));if(!cur)render()});
+  if(isPengawas){
+    sn(col.orderBy("createdAt","desc"),s=>{letters=rows(s);render()});
+    sn(db.collection("pengajuan"),s=>{peng=rows(s);render()});
+    sn(db.collection("disetujui"),s=>{appr=rows(s);render()});
+  }else{
+    sn(db.doc("disetujui/"+me),s=>{akses=s.exists?s.data():null;if(unsub){unsub();unsub=null}
+      if(akses&&akses.sekolahId)unsub=sn(col.where("sekolahId","==",akses.sekolahId),r=>{letters=rows(r).sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));if(!cur)render()});
+      else letters=[];
+      if(!cur)render()});
+    sn(db.doc("pengajuan/"+me),s=>{pj=s.exists?s.data():null;if(!cur)render()});
+  }
+  render();
+}
+function renderKepsek(){
+  if(cur)return renderSign();
+  if(akses){
+    const w=letters.filter(l=>l.status==="menunggu").length;
+    app.innerHTML=`<div class="stat" style="margin-bottom:16px"><b style="font-size:22px">${esc(akses.sekolahNama)}</b><span>Masuk sebagai ${esc(akses.nama)}${akses.peran==="operator"?" (operator sekolah)":""} · ${w?w+" surat menunggu tanda tangan Anda":"tidak ada surat yang menunggu"}</span></div>
+    ${letters.length?letters.map(l=>`<div class="row" tabindex="0" data-id="${l.id}"><div class="main"><b>${TYPES[l.type].nama}</b><span>Dari Makmur Nonci, S.Pd., MM.Pd · ${tgl(l.createdAt)}</span></div><span class="badge ${l.status==="menunggu"?"wait":"ok"}">${l.status==="menunggu"?"Perlu ditandatangani":"Sudah ditandatangani"}</span></div>`).join(""):'<div class="empty">Belum ada surat untuk sekolah Anda.</div>'}`;
+    document.querySelectorAll(".row").forEach(r=>{r.onclick=()=>{cur=letters.find(x=>x.id===r.dataset.id);render()};r.onkeydown=e=>{if(e.key==="Enter")r.click()}});
+    return;
+  }
+  if(pj&&pj.status==="menunggu"){app.innerHTML=`<div class="gate"><h2>Menunggu persetujuan</h2><div>Permintaan akses Anda sebagai ${pj.peran==="operator"?"operator":"kepala sekolah"} untuk <b>${esc(pj.sekolahNama)}</b> sudah dikirim. Halaman ini otomatis terbuka begitu pengawas menyetujuinya.</div></div>`;return}
+  const note=pj&&pj.status==="ditolak"?"Permintaan sebelumnya ditolak. Periksa data Anda lalu ajukan kembali.":pj&&pj.status==="dicabut"?"Akses Anda dicabut. Anda dapat mengajukan kembali.":"";
+  app.innerHTML=`<div class="gate"><h2>Daftar ke ruang sekolah</h2><div class="note">Pilih sekolah Anda. Pengawas akan memeriksa lalu menyetujui akses Anda.</div>${note?`<div class="msg">${note}</div>`:""}
+  <label>Nama lengkap<input id="a_nama" ${inp} style="font:inherit;letter-spacing:0;text-align:left;text-transform:none" value="${esc(pj&&pj.nama)}"></label><label>NIP<input id="a_nip" ${inp} style="font:inherit;letter-spacing:0;text-align:left;text-transform:none" value="${esc(pj&&pj.nip)}"></label>
+  <label>Daftar sebagai<select id="a_peran" ${inp}><option value="kepala">Kepala sekolah</option><option value="operator">Operator sekolah (mewakili kepala sekolah yang belum mendaftar)</option></select></label><label>Sekolah<select id="a_sek" ${inp}>${sek.length?sek.map(x=>`<option value="${x.id}">${esc(x.nama)}</option>`).join(""):'<option value="">Belum ada sekolah terdaftar</option>'}</select></label><div id="err"></div><button class="btn" id="a_go">Ajukan akses</button></div>`;
+  $("#a_go").onclick=async()=>{const nama=$("#a_nama").value.trim(),sid=$("#a_sek").value,sk=sek.find(x=>x.id===sid);
+    if(!nama||!sk){$("#err").innerHTML='<div class="msg">Isi nama dan pilih sekolah Anda.</div>';return}
+    try{await db.doc("pengajuan/"+me).set({nama,nip:$("#a_nip").value.trim(),peran:$("#a_peran").value,sekolahId:sid,sekolahNama:sk.nama,status:"menunggu",createdAt:new Date().toISOString()})}
+    catch(e){$("#err").innerHTML='<div class="msg">Permintaan belum terkirim. Coba lagi.</div>'}};
+}
+function vSek(){
+  $("#body").innerHTML=`<div class="form"><label>Tambah sekolah binaan<textarea id="sn" rows="4" placeholder="Satu nama sekolah per baris"></textarea></label><div><button class="btn" id="sadd">Tambahkan</button></div></div><div style="margin-top:16px">${sek.length?sek.map(x=>{const k=appr.filter(a=>a.sekolahId===x.id&&a.peran!=="operator"),op=appr.filter(a=>a.sekolahId===x.id&&a.peran==="operator");return`<div class="row" style="cursor:default"><div class="main"><b>${esc(x.nama)}</b><span>${k.length?"Kepala sekolah: "+esc(k.map(a=>a.nama).join(", ")):"Belum ada kepala sekolah terdaftar"}${op.length?" · Operator: "+esc(op.map(a=>a.nama).join(", ")):""} · ${letters.filter(l=>l.sekolahId===x.id).length} surat</span></div><button class="btn danger" data-ds="${x.id}">Hapus</button></div>`}).join(""):'<div class="empty">Belum ada sekolah binaan. Tambahkan nama sekolah di atas.</div>'}</div>`;
+  $("#sadd").onclick=async()=>{const ls=$("#sn").value.split("\n").map(x=>x.trim()).filter(x=>x&&!sek.some(y=>y.nama===x));$("#sadd").disabled=true;for(const n of ls)await db.doc("sekolah/"+rid()).set({nama:n})};
+  document.querySelectorAll("[data-ds]").forEach(b=>b.onclick=async()=>{if(confirm("Hapus sekolah ini dari daftar?"))await db.doc("sekolah/"+b.dataset.ds).delete()});
+}
+function vIzin(){
+  const wait=peng.filter(p=>p.status==="menunggu"&&!appr.find(a=>a.id===p.id));
+  const item=(p,btns)=>`<div class="row" style="cursor:default"><div class="main"><b>${esc(p.nama)}</b><span>${p.peran==="operator"?"Operator":"Kepala sekolah"} · ${esc(p.sekolahNama)} · NIP ${esc(p.nip||"-")}</span></div>${btns}</div>`;
+  $("#body").innerHTML=`<h3 style="margin-bottom:8px">Menunggu persetujuan</h3>${wait.length?wait.map(p=>item(p,`<button class="btn" data-ok="${p.id}">Setujui</button><button class="btn danger" data-no="${p.id}">Tolak</button>`)).join(""):'<div class="empty">Tidak ada permintaan baru.</div>'}
+  <h3 style="margin:20px 0 8px">Kepala sekolah yang disetujui</h3>${appr.length?appr.map(a=>item({...a,sekolahNama:a.sekolahNama},`<button class="btn danger" data-rv="${a.id}">Cabut akses</button>`)).join(""):'<div class="empty">Belum ada kepala sekolah yang disetujui.</div>'}`;
+  const act=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.onclick=async()=>{b.disabled=true;try{await fn(b)}catch(e){b.disabled=false}});
+  act("[data-ok]",async b=>{const p=peng.find(x=>x.id===b.dataset.ok);await db.doc("disetujui/"+p.id).set({nama:p.nama,nip:p.nip||"",peran:p.peran||"kepala",sekolahId:p.sekolahId,sekolahNama:p.sekolahNama,at:new Date().toISOString()});await db.doc("pengajuan/"+p.id).update({status:"disetujui"})});
+  act("[data-no]",b=>db.doc("pengajuan/"+b.dataset.no).update({status:"ditolak"}));
+  act("[data-rv]",async b=>{if(!confirm("Cabut akses kepala sekolah ini?"))throw 0;await db.doc("disetujui/"+b.dataset.rv).delete();await db.doc("pengajuan/"+b.dataset.rv).update({status:"dicabut"})});
+}
+const _vBaru=vBaru;
+vBaru=function(){_vBaru();const f=()=>{const a=appr.find(x=>x.sekolahId===$("#f_school").value&&x.peran!=="operator");if(a){$("#f_kepala").value=a.nama;$("#f_nip").value=a.nip||""}};$("#f_school").onchange=f;f()};
+init();
+</script>
+</body>
+</html>

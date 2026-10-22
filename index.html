@@ -74,7 +74,7 @@ canvas{width:100%;max-width:420px;height:150px;background:#fff;border:1px solid 
 .ttd{display:flex;justify-content:flex-end;margin-top:22px}
 .ttd.two{justify-content:space-between}
 .ttd div{text-align:center;min-width:200px}
-.ttd img{height:64px;display:block;margin:4px auto}
+.ttd img{height:64px;max-width:100%;object-fit:contain;display:block;margin:4px auto}
 .ttd .gap{height:72px}
 .hidden{display:none!important}
 .gate{max-width:440px;margin:40px auto;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:24px;display:grid;gap:12px}
@@ -175,7 +175,7 @@ async function simpan(){
 /* ---------- Dokumen surat ---------- */
 function paper(s){
   const d=s.data||{},sg=s.sign||{};
-  const ttdKs=(label)=>`<div>${label}<br>Kepala Sekolah,${sg.img?`<img src="${sg.img}" alt="Tanda tangan">`:'<div class="gap"></div>'}<b><u>${dots(sg.nama||s.kepala,28)}</u></b><br>NIP. ${dots(sg.nip||s.kepNip,22)}</div>`;
+  const ttdKs=(label)=>`<div>${label}<br>Kepala Sekolah,${sg.img?`<img src="${sg.img}" alt="Tanda tangan" style="height:${sg.h||64}px">`:'<div class="gap"></div>'}<b><u>${dots(sg.nama||s.kepala,28)}</u></b><br>NIP. ${dots(sg.nip||s.kepNip,22)}</div>`;
   if(s.type==="supervisi"){
     const g=(d.guru&&d.guru.length?d.guru:[{},{},{}]);
     return`<div class="paper"><div class="kop">PEMERINTAH KOTA PAREPARE<br>DINAS PENDIDIKAN DAN KEBUDAYAAN<b>${esc(s.school||"UPTD SDN ..... KOTA PAREPARE")}</b></div><h2>SURAT PERNYATAAN</h2><div class="ctr">Nomor: ${dots(sg.nomor,25)}</div>
@@ -223,8 +223,12 @@ function renderSign(){
   <div class="side">${done?`<div class="msg okmsg">Surat ini sudah ditandatangani pada ${tgl(s.sign.at)}.</div>`:`<div class="sign"><h3>Tanda tangan</h3>
   <div class="g2"><label>Nama lengkap<input id="s_nama" value="${esc(s.kepala||(akses&&akses.peran!=="operator"&&akses.nama)||"")}" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label><label>NIP<input id="s_nip" value="${esc(s.kepNip||(akses&&akses.peran!=="operator"&&akses.nip)||"")}" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label></div>
   ${s.type==="supervisi"?`<div class="g2"><label>Nomor surat<input id="s_nomor" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label><label>Alamat sekolah<input id="s_alamat" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px"></label></div>`:""}
-  ${akses&&akses.peran==="operator"?`<div class="msg okmsg">Anda masuk sebagai operator. Serahkan perangkat ini kepada kepala sekolah untuk memeriksa data dan menandatangani.</div><label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:flex-start"><input type="checkbox" id="s_conf" style="margin-top:4px"> Kepala sekolah hadir dan menandatangani sendiri di perangkat ini.</label>`:""}<div class="note">Gambar tanda tangan pada kotak di bawah dengan jari atau mouse.</div><canvas id="cv" width="840" height="300"></canvas>
-  <div id="err"></div><div style="display:flex;gap:8px"><button class="btn" id="ttd">Tandatangani surat</button><button class="btn ghost" id="clr">Hapus coretan</button></div></div>`}
+  ${akses&&akses.peran==="operator"?`<div class="msg okmsg">Anda masuk sebagai operator. Serahkan perangkat ini kepada kepala sekolah untuk memeriksa data dan menandatangani.</div><label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:flex-start"><input type="checkbox" id="s_conf" style="margin-top:4px"> Kepala sekolah hadir dan menandatangani sendiri di perangkat ini.</label>`:""}<div class="note">Gambar tanda tangan pada kotak di bawah dengan jari atau mouse, atau unggah hasil scan tanda tangan.</div><canvas id="cv" width="840" height="300"></canvas>
+  <div style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px"><label>Unggah hasil scan tanda tangan (foto/gambar)<input type="file" id="s_file" accept="image/*" style="padding:6px 0"></label>
+  <label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:center"><input type="checkbox" id="s_bg" checked> Hapus latar putih (agar menyatu dengan kertas)</label>
+  <div id="s_scanmsg" class="note"></div></div>
+  <label>Ukuran tanda tangan: <b id="s_hv">80</b> px<input type="range" id="s_h" min="30" max="220" step="2" value="80" style="width:100%"></label>
+  <div id="err"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="ttd">Tandatangani surat</button><button class="btn ghost" id="clr">Hapus coretan</button><button class="btn ghost" id="clrscan">Hapus scan</button></div></div>`}
   <div id="pp">${paper(s)}</div></div>`;
   $("#back").onclick=()=>{cur=null;render()};
   $("#prt").onclick=()=>{try{window.print()}catch(e){}};
@@ -234,14 +238,26 @@ function renderSign(){
   const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
   cv.onpointerdown=e=>{drawing=true;cv.setPointerCapture(e.pointerId);const[x,y]=pt(e);c.beginPath();c.moveTo(x,y)};
   cv.onpointermove=e=>{if(!drawing)return;const[x,y]=pt(e);c.lineTo(x,y);c.stroke();dirty=true};
-  cv.onpointerup=()=>drawing=false;
-  $("#clr").onclick=()=>{c.clearRect(0,0,cv.width,cv.height);dirty=false};
-  const preview=()=>{cur.sign={nama:$("#s_nama").value,nip:$("#s_nip").value,nomor:$("#s_nomor")?.value,alamat:$("#s_alamat")?.value,at:new Date().toISOString()};$("#pp").innerHTML=paper(cur);cur.sign=undefined};
-  document.querySelectorAll(".sign input").forEach(i=>i.oninput=preview);preview();
+  let scanFile=null,scanImg=null;
+  const getImg=()=>scanImg||(dirty?cv.toDataURL("image/png"):"");
+  const preview=()=>{$("#s_hv").textContent=$("#s_h").value;cur.sign={nama:$("#s_nama").value,nip:$("#s_nip").value,nomor:$("#s_nomor")?.value,alamat:$("#s_alamat")?.value,img:getImg(),h:+$("#s_h").value,at:new Date().toISOString()};$("#pp").innerHTML=paper(cur);cur.sign=undefined};
+  cv.onpointerup=()=>{drawing=false;preview()};
+  $("#clr").onclick=()=>{c.clearRect(0,0,cv.width,cv.height);dirty=false;preview()};
+  const olah=(file,transp)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
+    for(const mw of [900,600,400]){
+      const m=Math.min(1,mw/im.width),w=Math.max(1,Math.round(im.width*m)),h=Math.max(1,Math.round(im.height*m)),t=document.createElement("canvas");t.width=w;t.height=h;const x=t.getContext("2d");x.drawImage(im,0,0,w,h);
+      if(transp){const d=x.getImageData(0,0,w,h),q=d.data;for(let i=0;i<q.length;i+=4){const l=.299*q[i]+.587*q[i+1]+.114*q[i+2];if(l>225)q[i+3]=0;else if(l>160)q[i+3]=Math.round(255*(225-l)/65)}x.putImageData(d,0,0)}
+      const u=t.toDataURL("image/png");if(u.length<700000||mw===400){res(u);return}
+    }};im.src=fr.result};fr.readAsDataURL(file)});
+  const proses=async()=>{if(!scanFile)return;$("#s_scanmsg").textContent="Memproses gambar...";try{scanImg=await olah(scanFile,$("#s_bg").checked);$("#s_scanmsg").textContent="Scan terpasang. Geser pengaturan ukuran untuk memperbesar atau memperkecil."}catch(e){scanImg=null;$("#s_scanmsg").textContent="Gambar tidak dapat dibaca. Coba file lain (JPG atau PNG)."}preview()};
+  $("#s_file").onchange=e=>{scanFile=e.target.files[0]||null;if(scanFile)proses()};
+  $("#s_bg").onchange=proses;
+  $("#clrscan").onclick=()=>{scanFile=null;scanImg=null;$("#s_file").value="";$("#s_scanmsg").textContent="";preview()};
+  document.querySelectorAll(".sign input").forEach(i=>{if(i.type!=="file"&&i.type!=="checkbox")i.oninput=preview});preview();
   $("#ttd").onclick=async()=>{
     const nama=$("#s_nama").value.trim();
-    if(!nama||!dirty||($("#s_conf")&&!$("#s_conf").checked)){$("#err").innerHTML='<div class="msg">Lengkapi nama dan tanda tangan, dan centang konfirmasi jika Anda operator.</div>';return}
-    const sign={nama,nip:$("#s_nip").value.trim(),nomor:$("#s_nomor")?.value.trim()||"",alamat:$("#s_alamat")?.value.trim()||"",img:cv.toDataURL("image/png"),via:akses&&akses.peran==="operator"?akses.nama:"",at:new Date().toISOString()};
+    if(!nama||!(dirty||scanImg)||($("#s_conf")&&!$("#s_conf").checked)){$("#err").innerHTML='<div class="msg">Lengkapi nama dan tanda tangan, dan centang konfirmasi jika Anda operator.</div>';return}
+    const sign={nama,nip:$("#s_nip").value.trim(),nomor:$("#s_nomor")?.value.trim()||"",alamat:$("#s_alamat")?.value.trim()||"",img:getImg(),h:+$("#s_h").value,via:akses&&akses.peran==="operator"?akses.nama:"",at:new Date().toISOString()};
     $("#ttd").disabled=true;
     try{await db.doc("sekolah/"+s.sekolahId+"/surat/"+s.id).update({status:"ditandatangani",sign});cur={...s,status:"ditandatangani",sign};renderSign()}
     catch(e){$("#ttd").disabled=false;$("#err").innerHTML='<div class="msg">Tanda tangan belum tersimpan. Pastikan Anda diberi akses sebagai Contributor, lalu coba lagi.</div>'}

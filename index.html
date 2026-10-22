@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dashboard Surat Pengawas Sekolah</title>
+<title>Surat Pengawas Sekolah</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
@@ -109,39 +109,103 @@ const dots=(v,n=40)=>v?esc(v):".".repeat(n);
 let db=null,isPengawas=false,col=null,letters=[],tab="dash",openId=null,filter={st:"",ty:"",q:""},draftType="supervisi",unsub=null,gateMsg="";
 const app=$("#app");
 
-/* ====== ISI BAGIAN INI (lihat panduan) ====== */
-const FB={apiKey:"AIzaSyDR1mDn7L-EaENm-eQos9eVY-d7nOFoais",authDomain:"surat-aktivitas-ku.firebaseapp.com",projectId:"surat-aktivitas-ku",appId:"1:674813208292:web:0b6642c8cd22d494ee357d"};
-const ADMIN_EMAILS=["makmurnonci4@gmail.com"];
-/* ============================================ */
-let started=false;const lst={},sub={};
-const byNew=(a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"");
-function bantuan(){app.innerHTML='<div class="gate" style="max-width:640px"><h2>Konfigurasi belum diisi</h2><div>Isi <b>FB</b> dan <b>ADMIN_EMAILS</b> di bagian atas script terakhir pada file ini, sesuai panduan.</div></div>'}
-function masuk(){app.innerHTML='<div class="gate"><h2>Masuk</h2><div class="note">Masuk dengan akun Google Anda untuk melanjutkan.</div><button class="btn" id="g">Masuk dengan Google</button><div id="err"></div></div>';
-  $("#g").onclick=()=>firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{$("#err").innerHTML='<div class="msg">Gagal masuk: '+esc(e.code||e.message)+'</div>'})}
-function init(){
-  if(FB.apiKey.startsWith("ISI"))return bantuan();
-  firebase.initializeApp(FB);db=firebase.firestore();
-  firebase.auth().onAuthStateChanged(u=>{if(!u){started=false;return masuk()}if(started)return;started=true;mulai(u)});
+async function init(){
+  let user=null;try{user=await claude.use("user")}catch(e){}
+  try{db=await claude.use("db")}catch(e){}
+  try{isPengawas=user?await user.canEdit():false}catch(e){}
+  $("#role").textContent=isPengawas?"Pengawas":"Kepala sekolah";
+  if(!db){app.innerHTML='<div class="empty">Masuk ke akun claude.ai untuk membuka dashboard ini.</div>';return}
+  col=db.collection("surat");
+  if(isPengawas){unsub=col.orderBy("createdAt","desc").onSnapshot(s=>{letters=s.docs.map(d=>({id:d.id,...d.data()}));render()},e=>{app.innerHTML='<div class="empty">Data tidak dapat dimuat.</div>'})}
+  const h=location.hash.replace("#","");
+  if(!isPengawas&&h)bukaKode(h);else render();
 }
-function mulai(u){
-  me=u.uid;isPengawas=ADMIN_EMAILS.map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase());
-  $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah / operator";
-  if(!$("#out")){document.querySelector("header.top").insertAdjacentHTML("beforeend",'<button class="btn ghost" id="out">Keluar</button>');$("#out").onclick=()=>firebase.auth().signOut().then(()=>location.reload())}
-  sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));
-    if(isPengawas)sek.forEach(x=>{if(!sub[x.id])sub[x.id]=sn(db.collection("sekolah/"+x.id+"/surat"),r=>{lst[x.id]=rows(r);letters=[].concat(...Object.values(lst)).sort(byNew);render()})});
-    if(!cur)render()});
-  if(isPengawas){
-    sn(db.collection("pengajuan"),s=>{peng=rows(s);render()});
-    sn(db.collection("disetujui"),s=>{appr=rows(s);render()});
-  }else{
-    sn(db.doc("disetujui/"+me),s=>{akses=s.exists?s.data():null;if(unsub){unsub();unsub=null}
-      if(akses&&akses.sekolahId)unsub=sn(db.collection("sekolah/"+akses.sekolahId+"/surat"),r=>{letters=rows(r).sort(byNew);if(!cur)render()});
-      else letters=[];
-      if(!cur)render()});
-    sn(db.doc("pengajuan/"+me),s=>{pj=s.exists?s.data():null;if(!cur)render()});
+
+function render(){
+  if(!isPengawas){return renderKepsek()}
+  if(openId){const s=letters.find(x=>x.id===openId);return s?renderDetail(s):(openId=null,render())}
+  const pend=peng.filter(p=>p.status==="menunggu"&&!appr.find(a=>a.id===p.id)).length;const tabs=[["dash","Dashboard"],["jenis","Jenis surat"],["baru","Surat baru"],["sek","Sekolah binaan"],["izin","Persetujuan"+(pend?" ("+pend+")":"")]];
+  app.innerHTML=`<nav role="tablist">${tabs.map(([k,v])=>`<button role="tab" aria-selected="${tab===k}" data-t="${k}">${v}</button>`).join("")}</nav><div id="body"></div>`;
+  app.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+  ({dash:vDash,jenis:vJenis,baru:vBaru,sek:vSek,izin:vIzin})[tab]();
+}
+
+function vDash(){
+  const w=letters.filter(l=>l.status==="menunggu").length,o=letters.length-w;
+  const f=letters.filter(l=>(!filter.st||l.status===filter.st)&&(!filter.ty||l.type===filter.ty)&&(!filter.q||(l.school+" "+l.kepala).toLowerCase().includes(filter.q.toLowerCase())));
+  $("#body").innerHTML=`<div class="stats"><div class="stat"><b>${letters.length}</b><span>Total surat</span></div><div class="stat"><b style="color:var(--wait)">${w}</b><span>Menunggu tanda tangan</span></div><div class="stat"><b style="color:var(--ok)">${o}</b><span>Sudah ditandatangani</span></div></div>
+  <div class="bar"><input id="q" placeholder="Cari sekolah atau kepala sekolah" value="${esc(filter.q)}"><select id="fs"><option value="">Semua status</option><option value="menunggu">Menunggu</option><option value="ditandatangani">Ditandatangani</option></select><select id="ft"><option value="">Semua jenis</option>${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v.nama}</option>`).join("")}</select></div>
+  <div id="list">${f.length?f.map(l=>`<div class="row" tabindex="0" data-id="${l.id}"><div class="main"><b>${esc(l.school)}</b><span>${TYPES[l.type].nama} · Kepala sekolah: ${esc(l.kepala||"-")} · dibuat ${tgl(l.createdAt)}</span></div><span class="badge ${l.status==="menunggu"?"wait":"ok"}">${l.status==="menunggu"?"Menunggu TTD":"Ditandatangani"}</span></div>`).join(""):`<div class="empty">${letters.length?"Tidak ada surat yang cocok.":"Belum ada surat. Buka tab Surat baru untuk membuat yang pertama."}</div>`}</div>`;
+  $("#fs").value=filter.st;$("#ft").value=filter.ty;
+  $("#q").oninput=e=>{filter.q=e.target.value;vDash();const q=$("#q");q.focus();q.setSelectionRange(99,99)};
+  $("#fs").onchange=e=>{filter.st=e.target.value;vDash()};$("#ft").onchange=e=>{filter.ty=e.target.value;vDash()};
+  document.querySelectorAll(".row").forEach(r=>{r.onclick=()=>{openId=r.dataset.id;render()};r.onkeydown=e=>{if(e.key==="Enter")r.click()}});
+}
+
+function vJenis(){
+  $("#body").innerHTML=`<p class="note" style="margin-top:0">Daftar jenis surat yang tersedia. Pilih satu untuk membuat surat baru.</p><div class="types">${Object.entries(TYPES).map(([k,v])=>{const n=letters.filter(l=>l.type===k).length;return`<div class="type"><h3>${v.nama}</h3><div>${v.ket}</div><ul>${v.isi.map(i=>`<li>${i}</li>`).join("")}</ul><div class="note">${n} surat dibuat</div><div class="btns"><button class="btn" data-use="${k}">Buat surat ini</button><button class="btn ghost" data-pv="${k}">Lihat contoh</button></div></div>`}).join("")}</div><div id="pv" style="margin-top:20px"></div>`;
+  document.querySelectorAll("[data-use]").forEach(b=>b.onclick=()=>{draftType=b.dataset.use;tab="baru";render()});
+  document.querySelectorAll("[data-pv]").forEach(b=>b.onclick=()=>{$("#pv").innerHTML=paper({type:b.dataset.pv,data:{guru:[{},{},{}],kegiatan:[]},status:"menunggu"});$("#pv").scrollIntoView({behavior:"smooth"})});
+}
+
+function vBaru(){
+  const t=draftType;
+  $("#body").innerHTML=`<div class="form"><div class="g2"><label>Jenis surat<select id="f_type">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===t?"selected":""}>${v.nama}</option>`).join("")}</select></label><label>Sekolah binaan<select id="f_school">${sek.length?sek.map(x=>`<option value="${x.id}">${esc(x.nama)}</option>`).join(""):'<option value="">Belum ada sekolah</option>'}</select></label></div>
+  <div class="g2"><label>Nama kepala sekolah (penerima)<input type="text" id="f_kepala"></label><label>NIP kepala sekolah (opsional)<input type="text" id="f_nip"></label></div>
+  ${t==="supervisi"?`<label>Jenis supervisi<select id="f_jenis"><option>akademik</option><option>manajerial</option><option>akademik/manajerial</option></select></label><div><b style="font-size:14px">Guru yang disupervisi</b><div id="gurus" style="display:grid;gap:6px;margin-top:6px"></div><button class="btn ghost" id="addg" type="button" style="margin-top:8px">Tambah guru</button></div>`:
+  `<div><b style="font-size:14px">Jenis kegiatan</b><div class="chk" style="margin-top:6px">${["Pembinaan","Supervisi","Monitoring","Pendampingan"].map(k=>`<label><input type="checkbox" name="keg" value="${k}">${k}</label>`).join("")}</div></div><div class="g2"><label>Lain-lain (sebutkan)<input type="text" id="f_lain"></label><label>Dilaksanakan di<input type="text" id="f_di"></label></div><label>Hari / tanggal<input type="date" id="f_tgl"></label><label>Keterangan<textarea id="f_ket" rows="4"></textarea></label>`}
+  <div id="err"></div><div><button class="btn" id="save">Buat surat dan kode akses</button></div></div>`;
+  $("#f_type").onchange=e=>{draftType=e.target.value;vBaru()};
+  if(t==="supervisi"){const add=()=>{const d=document.createElement("div");d.className="guru";d.innerHTML=`<input type="text" placeholder="Nama guru / NIP"><input type="text" placeholder="Kelas / mapel"><input type="date"><input type="text" placeholder="Mapel disupervisi"><button type="button" class="btn ghost" aria-label="Hapus">×</button>`;d.querySelector("button").onclick=()=>d.remove();$("#gurus").append(d)};[1,2,3].forEach(add);$("#addg").onclick=add}
+  $("#save").onclick=simpan;
+}
+
+async function simpan(){
+  const t=draftType,sid=$("#f_school").value,school=(sek.find(x=>x.id===sid)||{}).nama||"",kepala=$("#f_kepala").value.trim();
+  if(!school){$("#err").innerHTML='<div class="msg">Pilih sekolah terlebih dahulu. Tambahkan sekolah di tab Sekolah binaan.</div>';return}
+  let data={};
+  if(t==="supervisi")data={jenis:$("#f_jenis").value,guru:[...document.querySelectorAll(".guru")].map(r=>{const i=r.querySelectorAll("input");return{nama:i[0].value,kelas:i[1].value,tgl:i[2].value,mapel:i[3].value}}).filter(g=>g.nama||g.mapel)};
+  else data={kegiatan:[...document.querySelectorAll("[name=keg]:checked")].map(c=>c.value),lain:$("#f_lain").value,di:$("#f_di").value||school,tgl:$("#f_tgl").value,ket:$("#f_ket").value};
+  const id=Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b%32]).join("");
+  $("#save").disabled=true;
+  try{await db.doc("sekolah/"+sid+"/surat/"+id).set({type:t,school,sekolahId:sid,kepala,kepNip:$("#f_nip").value.trim(),data,status:"menunggu",createdAt:new Date().toISOString()});openId=id;tab="dash";render()}
+  catch(e){$("#save").disabled=false;$("#err").innerHTML='<div class="msg">Surat belum tersimpan. Coba lagi.</div>'}
+}
+
+/* ---------- Dokumen surat ---------- */
+function paper(s){
+  const d=s.data||{},sg=s.sign||{};
+  const ttdKs=(label)=>`<div>${label}<br>Kepala Sekolah,${sg.img?`<img src="${sg.img}" alt="Tanda tangan">`:'<div class="gap"></div>'}<b><u>${dots(sg.nama||s.kepala,28)}</u></b><br>NIP. ${dots(sg.nip||s.kepNip,22)}</div>`;
+  if(s.type==="supervisi"){
+    const g=(d.guru&&d.guru.length?d.guru:[{},{},{}]);
+    return`<div class="paper"><div class="kop">PEMERINTAH KOTA PAREPARE<br>DINAS PENDIDIKAN DAN KEBUDAYAAN<b>${esc(s.school||"UPTD SDN ..... KOTA PAREPARE")}</b></div><h2>SURAT PERNYATAAN</h2><div class="ctr">Nomor: ${dots(sg.nomor,25)}</div>
+    <p>Yang bertanda tangan di bawah ini:</p><table class="kv"><tr><td>Nama</td><td>:</td><td>${dots(sg.nama||s.kepala,40)}</td></tr><tr><td>NIP</td><td>:</td><td>${dots(sg.nip||s.kepNip,40)}</td></tr><tr><td>Jabatan</td><td>:</td><td>Kepala Sekolah</td></tr><tr><td>Unit Kerja</td><td>:</td><td>${dots(s.school,40)}</td></tr><tr><td>Alamat Sekolah</td><td>:</td><td>${dots(sg.alamat,40)}</td></tr></table>
+    <p>Dengan ini menyatakan dengan sebenarnya bahwa:</p><table class="kv"><tr><td>Nama</td><td>:</td><td><b>${PENGAWAS.nama}</b></td></tr><tr><td>NIP</td><td>:</td><td>${PENGAWAS.nip}</td></tr><tr><td>Jabatan</td><td>:</td><td>Pengawas Sekolah Madya Jenjang SD</td></tr><tr><td>Unit Kerja/Wilayah Binaan</td><td>:</td><td>Kec. Bacukiki Barat</td></tr></table>
+    <p>Benar telah melaksanakan <b>supervisi ${esc(d.jenis||"akademik/manajerial")} (Proses Pembelajaran PM)</b> kepada guru di sekolah kami, dengan rincian sebagai berikut:</p>
+    <table class="grid"><tr><th>No</th><th>Nama Guru/NIP.</th><th>Guru Kelas/Mapel</th><th>Hari/Tanggal Pelaksanaan</th><th>Mapel yang disupervisi</th></tr>${g.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.nama)}</td><td>${esc(x.kelas)}</td><td>${x.tgl?tgl(x.tgl):""}</td><td>${esc(x.mapel)}</td></tr>`).join("")}</table>
+    <p>Kegiatan supervisi tersebut dilaksanakan dalam rangka pembinaan dan peningkatan mutu proses pembelajaran, sesuai dengan tugas pokok dan fungsi pengawas sekolah.</p><p>Demikian surat pernyataan ini kami buat dengan sebenar-benarnya, untuk dapat dipergunakan sebagaimana mestinya.</p>
+    <div class="ttd">${ttdKs("Parepare, "+tgl(sg.at))}</div></div>`;
   }
-  render();
+  const keg=d.kegiatan||[];
+  return`<div class="paper"><div class="kop"><b>LEMBAR AKTIVITAS PENGAWAS SEKOLAH</b><b>DI SEKOLAH BINAAN</b></div>
+  <p><b>IDENTITAS PENGAWAS</b></p><table class="grid"><tr><td width="30%"><b>Nama</b></td><td>${PENGAWAS.nama}</td></tr><tr><td><b>NIP</b></td><td>${PENGAWAS.nip.replace(/ /g,"")}</td></tr></table>
+  <p><b>JENIS KEGIATAN</b></p><table class="grid"><tr>${["Pembinaan","Supervisi"].map(k=>`<td>${keg.includes(k)?"☑":"☐"}&nbsp; ${k}</td>`).join("")}</tr><tr>${["Monitoring","Pendampingan"].map(k=>`<td>${keg.includes(k)?"☑":"☐"}&nbsp; ${k}</td>`).join("")}</tr><tr><td><b>Lain-lain (sebutkan)</b></td><td>${esc(d.lain)}</td></tr></table>
+  <p><b>PELAKSANAAN</b></p><table class="grid"><tr><td width="30%"><b>Dilaksanakan di</b></td><td>${esc(d.di||s.school)}</td></tr><tr><td><b>Pada Hari / Tanggal</b></td><td>${d.tgl?new Date(d.tgl).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):""}</td></tr></table>
+  <p><b>KETERANGAN</b></p><table class="grid"><tr><td style="height:110px;white-space:pre-wrap">${esc(d.ket)}</td></tr></table>
+  <div class="ttd two">${ttdKs("Mengetahui,")}<div>Parepare, ${tgl(sg.at||s.createdAt)}<br>Pengawas Sekolah Madya<div class="gap"></div><b><u>Makmur Nonci, S.Pd., MM.Pd</u></b></div></div></div>`;
 }
+
+/* ---------- Detail (pengawas) ---------- */
+function renderDetail(s){
+  app.innerHTML=`<div class="bar noprint"><button class="btn ghost" id="back">Kembali</button><button class="btn ghost" id="prt">Cetak</button><button class="btn danger" id="del">Hapus</button><span style="flex:1"></span><span class="badge ${s.status==="menunggu"?"wait":"ok"}">${s.status==="menunggu"?"Menunggu tanda tangan":"Ditandatangani "+tgl(s.sign&&s.sign.at)+(s.sign&&s.sign.via?" (via operator "+esc(s.sign.via)+")":"")}</span></div>
+  <div class="note noprint" style="margin-bottom:12px">Surat ini muncul otomatis di Ruang Kepala Sekolah untuk ${esc(s.school)} setelah akun kepala sekolahnya Anda setujui.</div>${paper(s)}`;
+  $("#back").onclick=()=>{openId=null;render()};
+  $("#prt").onclick=()=>{try{window.print()}catch(e){}};
+  $("#del").onclick=async()=>{if(confirm("Hapus surat ini?")){await db.doc("sekolah/"+s.sekolahId+"/surat/"+s.id).delete();openId=null}};
+}
+
+/* ---------- Kepala sekolah ---------- */
+let cur=null;
 function renderKepsek(){
   if(cur)return renderSign();
   app.innerHTML=`<div class="gate"><h2>Buka surat</h2><div class="note">Masukkan kode akses 6 karakter yang diberikan oleh Pengawas Sekolah.</div><input id="kode" maxlength="6" autocomplete="off" aria-label="Kode akses"><button class="btn" id="go">Buka surat</button>${gateMsg?`<div class="msg">${gateMsg}</div>`:""}</div>`;
@@ -191,22 +255,33 @@ const rid=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>"abcdefghj
 const rows=q=>q.docs.map(d=>({id:d.id,...d.data()}));
 const sn=(ref,fn)=>ref.onSnapshot(fn,e=>{app.innerHTML='<div class="empty">Data tidak dapat dimuat. Periksa koneksi dan aturan keamanan Firestore.</div>'});
 const inp='style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;width:100%"';
-async function init(){
-  let user=null;try{user=await claude.use("user")}catch(e){}
-  try{db=await claude.use("db")}catch(e){}
-  try{isPengawas=user?await user.canEdit():false}catch(e){}
-  try{me=user?await user.id():null}catch(e){}
-  $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah";
-  if(!db||(!me&&!isPengawas)){app.innerHTML='<div class="empty">Masuk ke akun claude.ai untuk membuka halaman ini.</div>';return}
-  col=db.collection("surat");
-  sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));if(!cur)render()});
+/* ====== ISI BAGIAN INI (lihat panduan) ====== */
+const FB={apiKey:"AIzaSyDR1mDn7L-EaENm-eQos9eVY-d7nOFoais",authDomain:"surat-aktivitas-ku.firebaseapp.com",projectId:"surat-aktivitas-ku",appId:"1:674813208292:web:0b6642c8cd22d494ee357d"};
+const ADMIN_EMAILS=["makmurnonci4@gmail.com"];
+/* ============================================ */
+let started=false;const lst={},sub={};
+const byNew=(a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"");
+function bantuan(){app.innerHTML='<div class="gate" style="max-width:640px"><h2>Konfigurasi belum diisi</h2><div>Isi <b>FB</b> dan <b>ADMIN_EMAILS</b> di bagian atas script terakhir pada file ini, sesuai panduan.</div></div>'}
+function masuk(){app.innerHTML='<div class="gate"><h2>Masuk</h2><div class="note">Masuk dengan akun Google Anda untuk melanjutkan.</div><button class="btn" id="g">Masuk dengan Google</button><div id="err"></div></div>';
+  $("#g").onclick=()=>firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{$("#err").innerHTML='<div class="msg">Gagal masuk: '+esc(e.code||e.message)+'</div>'})}
+function init(){
+  if(FB.apiKey.startsWith("ISI"))return bantuan();
+  firebase.initializeApp(FB);db=firebase.firestore();
+  firebase.auth().onAuthStateChanged(u=>{if(!u){started=false;return masuk()}if(started)return;started=true;mulai(u)});
+}
+function mulai(u){
+  me=u.uid;isPengawas=ADMIN_EMAILS.map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase());
+  $("#role").textContent=isPengawas?"Pengawas (admin)":"Kepala sekolah / operator";
+  if(!$("#out")){document.querySelector("header.top").insertAdjacentHTML("beforeend",'<button class="btn ghost" id="out">Keluar</button>');$("#out").onclick=()=>firebase.auth().signOut().then(()=>location.reload())}
+  sn(db.collection("sekolah"),s=>{sek=rows(s).sort((a,b)=>(a.nama||"").localeCompare(b.nama||""));
+    if(isPengawas)sek.forEach(x=>{if(!sub[x.id])sub[x.id]=sn(db.collection("sekolah/"+x.id+"/surat"),r=>{lst[x.id]=rows(r);letters=[].concat(...Object.values(lst)).sort(byNew);render()})});
+    if(!cur)render()});
   if(isPengawas){
-    sn(col.orderBy("createdAt","desc"),s=>{letters=rows(s);render()});
     sn(db.collection("pengajuan"),s=>{peng=rows(s);render()});
     sn(db.collection("disetujui"),s=>{appr=rows(s);render()});
   }else{
     sn(db.doc("disetujui/"+me),s=>{akses=s.exists?s.data():null;if(unsub){unsub();unsub=null}
-      if(akses&&akses.sekolahId)unsub=sn(col.where("sekolahId","==",akses.sekolahId),r=>{letters=rows(r).sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));if(!cur)render()});
+      if(akses&&akses.sekolahId)unsub=sn(db.collection("sekolah/"+akses.sekolahId+"/surat"),r=>{letters=rows(r).sort(byNew);if(!cur)render()});
       else letters=[];
       if(!cur)render()});
     sn(db.doc("pengajuan/"+me),s=>{pj=s.exists?s.data():null;if(!cur)render()});

@@ -164,6 +164,7 @@ function vBaru(){
   <div class="g2" id="w_nama"><label><span id="l_kepala">Nama kepala sekolah (penerima)</span><input type="text" id="f_kepala"></label><label><span id="l_nip">NIP kepala sekolah (opsional)</span><input type="text" id="f_nip"></label></div>
   ${k?"":t==="supervisi"?`<label>Jenis supervisi<select id="f_jenis"><option>akademik</option><option>manajerial</option><option>akademik/manajerial</option></select></label><div><b style="font-size:14px">Guru yang disupervisi</b><div id="gurus" style="display:grid;gap:6px;margin-top:6px"></div><button class="btn ghost" id="addg" type="button" style="margin-top:8px">Tambah guru</button></div>`:
   `<div><b style="font-size:14px">Jenis kegiatan</b><div class="chk" style="margin-top:6px">${["Pembinaan","Supervisi","Monitoring","Pendampingan"].map(k=>`<label><input type="checkbox" name="keg" value="${k}">${k}</label>`).join("")}</div></div><div class="g2"><label>Lain-lain (sebutkan)<input type="text" id="f_lain"></label><label>Dilaksanakan di<input type="text" id="f_di"></label></div><label>Hari / tanggal<input type="date" id="f_tgl"></label><label>Keterangan<textarea id="f_ket" rows="4"></textarea></label>`}
+  ${(k||t==="supervisi")?`<details style="border:1px solid var(--line);border-radius:8px;padding:10px 12px"><summary style="cursor:pointer"><b>Kop surat</b> (klik untuk mengubah)</summary><div id="kophost" style="display:grid;gap:10px;margin-top:10px"></div><label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:center;margin-top:10px"><input type="checkbox" id="k_def"> Simpan sebagai kop bawaan di perangkat ini</label></details>`:""}
   <div id="err"></div><div><button class="btn" id="save">Buat surat dan kode akses</button></div></div>`;
   $("#f_type").onchange=e=>{draftType=e.target.value;vBaru()};
   const sch=$("#f_school"),pil=()=>k?$("#f_pihak").value:"kepala";
@@ -173,6 +174,7 @@ function vBaru(){
   sch.onchange=()=>{isiGuru();isiNama()};
   if(k){$("#f_pihak").onchange=()=>{$("#f_kepala").value="";$("#f_nip").value="";tata();isiNama()};$("#f_guru").onchange=()=>{if(!$("#f_guru").value){$("#f_kepala").value="";$("#f_nip").value=""}isiNama()}}
   isiGuru();tata();isiNama();
+  kopEd=(k||t==="supervisi")?kopEditor($("#kophost"),kopDef(t),null):null;
   if(t==="supervisi"){const add=()=>{const d=document.createElement("div");d.className="guru";d.innerHTML=`<input type="text" placeholder="Nama guru / NIP"><input type="text" placeholder="Kelas / mapel"><input type="date"><input type="text" placeholder="Mapel disupervisi"><button type="button" class="btn ghost" aria-label="Hapus">×</button>`;d.querySelector("button").onclick=()=>d.remove();$("#gurus").append(d)};[1,2,3].forEach(add);$("#addg").onclick=add}
   $("#save").onclick=simpan;
 }
@@ -191,10 +193,52 @@ async function simpan(){
   }
   else data={kegiatan:[...document.querySelectorAll("[name=keg]:checked")].map(c=>c.value),lain:$("#f_lain").value,di:$("#f_di").value||school,tgl:$("#f_tgl").value,ket:$("#f_ket").value};
   const guruId=pihak==="guru"?$("#f_guru").value:"";
+  const kop=(t==="kustom"||t==="supervisi")&&kopEd?kopEd.get():null;
+  if(kop&&$("#k_def")&&$("#k_def").checked){try{localStorage.setItem("kop_"+kopKey(t),JSON.stringify(kop))}catch(e){}}
   const id=Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b%32]).join("");
   $("#save").disabled=true;
-  try{await db.doc("sekolah/"+sid+"/surat/"+id).set({type:t,school,sekolahId:sid,kepala,kepNip,data,...(guruId?{guruId}:{}),status:"menunggu",createdAt:new Date().toISOString()});openId=id;tab="dash";render()}
+  try{await db.doc("sekolah/"+sid+"/surat/"+id).set({type:t,school,sekolahId:sid,kepala,kepNip,data,...(guruId?{guruId}:{}),...(kop?{kop}:{}),status:"menunggu",createdAt:new Date().toISOString()});openId=id;tab="dash";render()}
   catch(e){$("#save").disabled=false;$("#err").innerHTML='<div class="msg">Surat belum tersimpan. Coba lagi.</div>'}
+}
+
+/* ---------- Kop surat ---------- */
+const DEF_KOP={
+  supervisi:{lines:[{t:"PEMERINTAH KOTA PAREPARE"},{t:"DINAS PENDIDIKAN DAN KEBUDAYAAN"},{t:"{sekolah}",b:true}],logo:"",logoH:70,garis:false},
+  kustom:{lines:[{t:"PEMERINTAH KOTA PAREPARE"},{t:"DINAS PENDIDIKAN DAN KEBUDAYAAN"},{t:"PENGAWAS SEKOLAH KECAMATAN BACUKIKI BARAT",b:true}],logo:"",logoH:70,garis:false}
+};
+const kopKey=t=>t==="supervisi"?"supervisi":"kustom";
+const kopDef=t=>{try{const v=JSON.parse(localStorage.getItem("kop_"+kopKey(t))||"null");if(v&&v.lines&&v.lines.length)return v}catch(e){}return DEF_KOP[kopKey(t)]};
+let kopEd=null;
+function kopHtml(s){
+  const k=s.kop||DEF_KOP[kopKey(s.type)],sek=s.school||"UPTD SDN ..... KOTA PAREPARE";
+  const txt=(k.lines||[]).filter(l=>l.t&&l.t.trim()).map(l=>{const t=esc(l.t.split("{sekolah}").join(sek));return l.b?`<b>${t}</b>`:`<div>${t}</div>`}).join("");
+  const st=k.garis?"border-bottom:3px double #111;padding-bottom:8px;margin-bottom:10px;":"";
+  if(!k.logo)return`<div class="kop" style="${st}">${txt}</div>`;
+  const h=k.logoH||70;
+  return`<div class="kop" style="${st}display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px"><img src="${k.logo}" alt="Logo" style="height:${h}px"><div>${txt}</div><img src="${k.logo}" alt="" style="height:${h}px;visibility:hidden"></div>`;
+}
+const kecil=file=>new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{for(const mw of [240,160,100]){const m=Math.min(1,mw/im.width),t=document.createElement("canvas");t.width=Math.max(1,Math.round(im.width*m));t.height=Math.max(1,Math.round(im.height*m));t.getContext("2d").drawImage(im,0,0,t.width,t.height);const u=t.toDataURL("image/png");if(u.length<150000||mw===100){res(u);return}}};im.src=fr.result};fr.readAsDataURL(file)});
+function kopEditor(host,kop,onChange){
+  const st={lines:(kop.lines||[]).map(l=>({t:l.t||"",b:!!l.b})),logo:kop.logo||"",logoH:kop.logoH||70,garis:!!kop.garis};
+  if(!st.lines.length)st.lines.push({t:"",b:false});
+  const fld='style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;width:100%"',fire=()=>{if(onChange)onChange()};
+  const draw=()=>{
+    host.innerHTML=`<div style="display:grid;gap:6px">${st.lines.map((l,i)=>`<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center"><input type="text" data-i="${i}" value="${esc(l.t)}" placeholder="Teks baris kop" ${fld}><label style="display:flex;flex-direction:row;gap:4px;font-weight:400;align-items:center;white-space:nowrap"><input type="checkbox" data-b="${i}" ${l.b?"checked":""}> Tebal</label><button type="button" class="btn ghost" data-x="${i}" aria-label="Hapus baris">×</button></div>`).join("")}</div>
+    <div><button type="button" class="btn ghost" data-add>Tambah baris</button></div>
+    <div class="note">Tulis {sekolah} pada satu baris agar otomatis diganti nama sekolah penerima.</div>
+    <div style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px"><label>Logo (opsional)<input type="file" data-logo accept="image/*" style="padding:6px 0"></label>${st.logo?`<img src="${st.logo}" alt="Logo" style="height:48px;object-fit:contain;justify-self:start"><label>Ukuran logo: <b data-lv>${st.logoH}</b> px<input type="range" data-lh min="30" max="140" step="2" value="${st.logoH}" style="width:100%"></label><div><button type="button" class="btn ghost" data-xlogo>Hapus logo</button></div>`:""}</div>
+    <label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:center"><input type="checkbox" data-garis ${st.garis?"checked":""}> Garis pemisah di bawah kop</label>`;
+    host.querySelectorAll("[data-i]").forEach(e=>e.oninput=()=>{st.lines[+e.dataset.i].t=e.value;fire()});
+    host.querySelectorAll("[data-b]").forEach(e=>e.onchange=()=>{st.lines[+e.dataset.b].b=e.checked;fire()});
+    host.querySelectorAll("[data-x]").forEach(e=>e.onclick=()=>{st.lines.splice(+e.dataset.x,1);draw();fire()});
+    host.querySelector("[data-add]").onclick=()=>{st.lines.push({t:"",b:false});draw();fire()};
+    host.querySelector("[data-garis]").onchange=e=>{st.garis=e.target.checked;fire()};
+    host.querySelector("[data-logo]").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{st.logo=await kecil(f)}catch(x){}draw();fire()};
+    const lh=host.querySelector("[data-lh]");
+    if(lh){lh.oninput=()=>{st.logoH=+lh.value;host.querySelector("[data-lv]").textContent=lh.value;fire()};host.querySelector("[data-xlogo]").onclick=()=>{st.logo="";draw();fire()}}
+  };
+  draw();
+  return{get:()=>({lines:st.lines.filter(l=>l.t.trim()),logo:st.logo,logoH:st.logoH,garis:st.garis})};
 }
 
 /* ---------- Dokumen surat ---------- */
@@ -204,7 +248,7 @@ function paper(s){
   const ttdKs=(label)=>`<div>${label}<br>${rl},${sg.img?`<img src="${sg.img}" alt="Tanda tangan" style="height:${sg.h||64}px">`:'<div class="gap"></div>'}<b><u>${dots(sg.nama||s.kepala,28)}</u></b><br>NIP. ${dots(sg.nip||s.kepNip,22)}</div>`;
   if(s.type==="supervisi"){
     const g=(d.guru&&d.guru.length?d.guru:[{},{},{}]);
-    return`<div class="paper"><div class="kop">PEMERINTAH KOTA PAREPARE<br>DINAS PENDIDIKAN DAN KEBUDAYAAN<b>${esc(s.school||"UPTD SDN ..... KOTA PAREPARE")}</b></div><h2>SURAT PERNYATAAN</h2><div class="ctr">Nomor: ${dots(sg.nomor,25)}</div>
+    return`<div class="paper">${kopHtml(s)}<h2>SURAT PERNYATAAN</h2><div class="ctr">Nomor: ${dots(sg.nomor,25)}</div>
     <p>Yang bertanda tangan di bawah ini:</p><table class="kv"><tr><td>Nama</td><td>:</td><td>${dots(sg.nama||s.kepala,40)}</td></tr><tr><td>NIP</td><td>:</td><td>${dots(sg.nip||s.kepNip,40)}</td></tr><tr><td>Jabatan</td><td>:</td><td>Kepala Sekolah</td></tr><tr><td>Unit Kerja</td><td>:</td><td>${dots(s.school,40)}</td></tr><tr><td>Alamat Sekolah</td><td>:</td><td>${dots(sg.alamat,40)}</td></tr></table>
     <p>Dengan ini menyatakan dengan sebenarnya bahwa:</p><table class="kv"><tr><td>Nama</td><td>:</td><td><b>${PENGAWAS.nama}</b></td></tr><tr><td>NIP</td><td>:</td><td>${PENGAWAS.nip}</td></tr><tr><td>Jabatan</td><td>:</td><td>Pengawas Sekolah Madya Jenjang SD</td></tr><tr><td>Unit Kerja/Wilayah Binaan</td><td>:</td><td>Kec. Bacukiki Barat</td></tr></table>
     <p>Benar telah melaksanakan <b>supervisi ${esc(d.jenis||"akademik/manajerial")} (Proses Pembelajaran PM)</b> kepada guru di sekolah kami, dengan rincian sebagai berikut:</p>
@@ -215,7 +259,7 @@ function paper(s){
   if(s.type==="kustom"){
     const pih=d.pihak||"kepala",tmp=d.tempat||"Parepare",tg=tgl(d.tglSurat||sg.at||s.createdAt);
     const left=pih==="none"?"":ttdKs(pih==="guru"?"Yang bersangkutan,":"Mengetahui,");
-    return`<div class="paper"><div class="kop">PEMERINTAH KOTA PAREPARE<br>DINAS PENDIDIKAN DAN KEBUDAYAAN<b>PENGAWAS SEKOLAH KECAMATAN BACUKIKI BARAT</b></div><h2>${esc((d.judul||"JUDUL SURAT").toUpperCase())}</h2>${d.nomor?`<div class="ctr">Nomor: ${esc(d.nomor)}</div>`:""}
+    return`<div class="paper">${kopHtml(s)}<h2>${esc((d.judul||"JUDUL SURAT").toUpperCase())}</h2>${d.nomor?`<div class="ctr">Nomor: ${esc(d.nomor)}</div>`:""}
     ${d.kepada?`<p>Kepada Yth.<br><b>${esc(d.kepada)}</b></p>`:""}<div style="white-space:pre-wrap;text-align:justify;margin:12px 0">${esc(d.isi||"Isi surat.")}</div>
     <div class="ttd${pih==="none"?"":" two"}">${left}${ttdPg(esc(tmp)+", "+tg,true)}</div></div>`;
   }
@@ -246,10 +290,10 @@ function padTtd(host,onChange){
   cv.onpointerup=()=>{drawing=false;fire()};
   q(".p_clr").onclick=()=>{c.clearRect(0,0,cv.width,cv.height);dirty=false;fire()};
   const olah=(file,transp)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
-    for(const mw of [900,600,400]){
+    for(const mw of [900,600,400,300]){
       const m=Math.min(1,mw/im.width),w=Math.max(1,Math.round(im.width*m)),h=Math.max(1,Math.round(im.height*m)),t=document.createElement("canvas");t.width=w;t.height=h;const x=t.getContext("2d");x.drawImage(im,0,0,w,h);
       if(transp){const d=x.getImageData(0,0,w,h),a=d.data;for(let i=0;i<a.length;i+=4){const l=.299*a[i]+.587*a[i+1]+.114*a[i+2];if(l>225)a[i+3]=0;else if(l>160)a[i+3]=Math.round(255*(225-l)/65)}x.putImageData(d,0,0)}
-      const u=t.toDataURL("image/png");if(u.length<700000||mw===400){res(u);return}
+      const u=t.toDataURL("image/png");if(u.length<250000||mw===300){res(u);return}
     }};im.src=fr.result};fr.readAsDataURL(file)});
   const proses=async()=>{if(!scanFile)return;q(".p_msg").textContent="Memproses gambar...";try{scanImg=await olah(scanFile,q(".p_bg").checked);q(".p_msg").textContent="Scan terpasang. Geser pengaturan ukuran untuk memperbesar atau memperkecil."}catch(e){scanImg=null;q(".p_msg").textContent="Gambar tidak dapat dibaca. Coba file lain (JPG atau PNG)."}fire()};
   q(".p_file").onchange=e=>{scanFile=e.target.files[0]||null;if(scanFile)proses()};
@@ -268,12 +312,22 @@ function renderDetail(s){
   app.innerHTML=`<div class="bar noprint"><button class="btn ghost" id="back">Kembali</button><button class="btn ghost" id="prt">Cetak</button><button class="btn danger" id="del">Hapus</button><span style="flex:1"></span>${pgOk?`<span class="badge ${s.pgSign?"ok":"wait"}">${s.pgSign?"TTD pengawas sudah":"TTD pengawas belum"}</span>`:""}<span class="badge ${s.status==="menunggu"?"wait":"ok"}">${s.status==="menunggu"?"Menunggu tanda tangan":"Ditandatangani "+tgl(wkt)+(s.sign&&s.sign.via?" (via operator "+esc(s.sign.via)+")":"")}</span></div>
   <div class="note noprint" style="margin-bottom:12px">${info}</div>
   ${pgOk?`<div class="sign noprint" style="margin-bottom:12px"><h3>Tanda tangan pengawas</h3><div id="padhost" style="display:grid;gap:12px"></div><div id="err"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="pgsave">Simpan tanda tangan pengawas</button>${s.pgSign?'<button class="btn danger" id="pgdel">Hapus tanda tangan pengawas</button>':""}</div><div class="note">Tanda tangan juga diingat di perangkat ini agar bisa dipakai untuk surat berikutnya.</div></div>`:""}
+  ${(s.type==="kustom"||s.type==="supervisi")?`<details class="sign noprint" style="margin-bottom:12px"><summary style="cursor:pointer"><b>Edit kop surat</b></summary><div id="kophost" style="display:grid;gap:10px;margin-top:10px"></div><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><button class="btn" id="kopsave">Simpan kop</button><label style="display:flex;flex-direction:row;gap:8px;font-weight:400;align-items:center"><input type="checkbox" id="k_def"> Jadikan kop bawaan di perangkat ini</label></div><div id="kopmsg"></div></details>`:""}
   <div id="pp">${paper(s)}</div>`;
   $("#back").onclick=()=>{openId=null;render()};
   $("#prt").onclick=()=>{try{window.print()}catch(e){}};
   $("#del").onclick=async()=>{if(confirm("Hapus surat ini?")){await db.doc(path).delete();openId=null}};
+  let pad=null,curKop=s.kop;
+  const view=()=>{const o={...s,kop:curKop};if(pad&&pad.has()){const g=pad.get();o.pgSign={img:g.img,h:g.h}}$("#pp").innerHTML=paper(o)};
+  if($("#kophost")){
+    const ke=kopEditor($("#kophost"),s.kop||DEF_KOP[kopKey(s.type)],()=>{curKop=ke.get();view()});
+    $("#kopsave").onclick=async()=>{const kop=ke.get();$("#kopsave").disabled=true;
+      try{await db.doc(path).update({kop});if($("#k_def").checked){try{localStorage.setItem("kop_"+kopKey(s.type),JSON.stringify(kop))}catch(e){}}$("#kopmsg").innerHTML='<div class="msg okmsg" style="margin-top:8px">Kop tersimpan.</div>'}
+      catch(e){$("#kopmsg").innerHTML='<div class="msg" style="margin-top:8px">Kop belum tersimpan. Coba lagi.</div>'}
+      $("#kopsave").disabled=false};
+  }
   if(!pgOk)return;
-  const pad=padTtd($("#padhost"),()=>{const g=pad.get();$("#pp").innerHTML=paper({...s,pgSign:pad.has()?{img:g.img,h:g.h}:s.pgSign})});
+  pad=padTtd($("#padhost"),view);
   let saved=s.pgSign;if(!saved){try{saved=JSON.parse(localStorage.getItem("ttd_pengawas")||"null")}catch(e){}}
   if(saved&&saved.img)pad.load(saved.img,saved.h);
   $("#pgsave").onclick=async()=>{
